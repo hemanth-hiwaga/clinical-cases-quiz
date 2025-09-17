@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Case Quiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    /* Keep your visual design, improved minor spacing */
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      background: linear-gradient(180deg, #f3f4f6 0%, #e0e7ef 100%);
+      margin: 0;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+    h1 { text-align:center; margin-bottom:1.5rem; letter-spacing:-1px; font-weight:700; color:#1e293b; }
+    .question {
+      background:#fff; margin:1.2rem auto; padding:1.2rem 1.1rem; border-radius:16px;
+      box-shadow:0 4px 18px rgba(30,41,59,0.10), 0 1.5px 4px rgba(30,41,59,0.06);
+      max-width:600px;
+    }
+    .options label { display:block; margin:.5rem 0; padding:.5rem .7rem; border-radius:8px; cursor:pointer; transition:background .15s; }
+    .options label:hover { background:#f1f5f9; }
+    .feedback { font-weight:600; margin-top:.7rem; font-size:1.05em; }
+    .feedback.correct { color: #16a34a; }
+    .feedback.incorrect { color: #ef4444; }
+
+    button, .back-btn {
+      background: linear-gradient(90deg,#2563eb 60%,#60a5fa 100%);
+      color:#fff; border:none; padding:.7rem 1.5rem; border-radius:8px; margin:1.2rem auto; cursor:pointer;
+      font-size:1.08em; font-weight:600; box-shadow:0 2px 8px rgba(37,99,235,0.08); display:block; text-align:center; text-decoration:none;
+    }
+    button[disabled] { opacity:.55; cursor:not-allowed; box-shadow:none; transform:none; }
+    button:hover, .back-btn:hover { background: linear-gradient(90deg,#1d4ed8 60%,#38bdf8 100%); box-shadow:0 4px 16px rgba(37,99,235,0.13); }
+
+    .skeleton {
+      background: linear-gradient(90deg,#f3f4f6 25%,#e5e7eb 50%,#f3f4f6 75%);
+      background-size:200% 100%; animation:skeleton-loading 1.2s infinite linear; border-radius:12px; min-height:80px; margin:1.2rem auto; max-width:600px;
+    }
+    @keyframes skeleton-loading { 0%{background-position:200% 0;} 100%{background-position:-200% 0;} }
+
+    .modal-bg { position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(30,41,59,0.18); z-index:1000; display:none; align-items:center; justify-content:center; }
+    .modal { background:#fff; border-radius:18px; box-shadow:0 8px 32px rgba(30,41,59,0.18); max-width:95vw; width:420px; padding:2rem 1.2rem 1.2rem; text-align:center; }
+    .modal h2 { margin-top:0; color:#2563eb; font-size:1.4em; }
+    .modal .score { font-size:1.2em; font-weight:700; margin:0.7em 0 1em 0; color:#1e293b; }
+    .wrong-detail { background:#f8fafc; border-radius:8px; margin:0.7em 0; padding:0.7em; text-align:left; font-size:0.95em; color:#334155; }
+    .wrong-detail strong { color:#ef4444; }
+    .close-btn { background:#2563eb; color:#fff; border:none; border-radius:8px; padding:0.6em 1.3em; font-size:1em; font-weight:600; margin-top:1.2em; cursor:pointer; }
+    .close-btn:hover { background:#1d4ed8; }
+
+    .message { text-align:center; color:#334155; margin-top:1rem; max-width:600px; margin-left:auto; margin-right:auto; }
+
+    @media (max-width:700px) { body{padding:.75rem;} .question{padding:.9rem;} }
+  </style>
+</head>
+<body>
+  <div id="modal-bg" class="modal-bg" aria-hidden="true"></div>
+
+  <h1>Case Quiz</h1>
+
+  <div id="quiz"></div>
+
+  <button id="submitBtn" disabled>Submit All</button>
+  <a href="index.html" class="back-btn" aria-label="Back to Cases">← Back to Cases</a>
+  <div id="message" class="message" aria-live="polite"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script>
+  (function(){
+    // SETTINGS
+    const QUESTIONS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSETi226ZBtZelVhRmXvYVWO-OxxieKnXYrvn5DVioPDsV-rNGQqy8qiVpxEarb2P4XlkAZZ6pw3xmB/pub?gid=1711434852&single=true&output=csv";
+    const urlParams = new URLSearchParams(window.location.search);
+    const caseIdParam = urlParams.get("case_id") ? String(urlParams.get("case_id")).trim() : null;
+
+    const quizDiv = document.getElementById('quiz');
+    const submitBtn = document.getElementById('submitBtn');
+    const modalBg = document.getElementById('modal-bg');
+    const msg = document.getElementById('message');
+
+    // initial skeleton placeholders
+    for(let i=0;i<3;i++){ const s = document.createElement('div'); s.className='skeleton'; quizDiv.appendChild(s); }
+
+    if(!caseIdParam){
+      quizDiv.innerHTML = '';
+      msg.innerHTML = `No case selected. Please go back and choose a case.`;
+      submitBtn.disabled = true;
+      console.warn('Missing case_id in URL.');
+      return;
+    }
+
+    // helpers: normalize CSV row keys and values
+    function normalizeRow(row){
+      const out = {};
+      for(const k in row){
+        if(!Object.prototype.hasOwnProperty.call(row, k)) continue;
+        // strip BOM from keys if present, trim, and normalize
+        const rawKey = String(k || '').replace(/^\uFEFF/, '').trim();
+        const keyNorm = rawKey.replace(/[^a-z0-9]/gi, '').toLowerCase(); // e.g., "case_id" -> "caseid"
+        const val = row[k] == null ? '' : String(row[k]).trim();
+        out[keyNorm] = val;
+      }
+      return out;
+    }
+
+    // parse options robustly - returns array or object depending on content
+    function parseOptions(raw){
+      const s = (raw ?? '') + '';
+      if(!s.trim()) return [];
+      // try JSON
+      try {
+        const parsed = JSON.parse(s);
+        return parsed;
+      } catch(e){}
+      // check for pair/object style like "A:B||C:D"
+      if(s.includes(':') && (s.includes('||') || s.includes('|'))){
+        const pairs = s.split(/\|\||\|/).map(p => p.trim()).filter(Boolean);
+        const obj = {};
+        pairs.forEach(pair => {
+          const sep = pair.includes(':') ? ':' : (pair.includes('->') ? '->' : (pair.includes('→') ? '→' : ':'));
+          const [left, ...rest] = pair.split(sep);
+          if(left && rest.length) obj[left.trim()] = rest.join(sep).trim();
+        });
+        if(Object.keys(obj).length) return obj;
+      }
+      // separators
+      if(s.includes('||')) return s.split('||').map(x=>x.trim()).filter(Boolean);
+      if(s.includes('|')) return s.split('|').map(x=>x.trim()).filter(Boolean);
+      if(s.includes(';')) return s.split(';').map(x=>x.trim()).filter(Boolean);
+      if(s.includes(',')) return s.split(',').map(x=>x.trim()).filter(Boolean);
+      // single value
+      return [s.trim()];
+    }
+
+    // parse correct answer: could be JSON array, JSON object (for match), or separated values
+    function parseCorrect(raw){
+      const s = (raw ?? '') + '';
+      if(!s.trim()) return [];
+      try {
+        const parsed = JSON.parse(s);
+        return parsed;
+      } catch(e){}
+      // object-style pairs
+      if(s.includes(':') && (s.includes('||') || s.includes('|'))){
+        const pairs = s.split(/\|\||\|/).map(p => p.trim()).filter(Boolean);
+        const obj = {};
+        pairs.forEach(pair => {
+          const sep = pair.includes(':') ? ':' : (pair.includes('->') ? '->' : (pair.includes('→') ? '→' : ':'));
+          const [left, ...rest] = pair.split(sep);
+          if(left && rest.length) obj[left.trim()] = rest.join(sep).trim();
+        });
+        if(Object.keys(obj).length) return obj;
+      }
+      // list separators
+      if(s.includes('||')) return s.split('||').map(x=>x.trim()).filter(Boolean);
+      if(s.includes('|')) return s.split('|').map(x=>x.trim()).filter(Boolean);
+      if(s.includes(';')) return s.split(';').map(x=>x.trim()).filter(Boolean);
+      if(s.includes(',')) return s.split(',').map(x=>x.trim()).filter(Boolean);
+      return [s.trim()];
+    }
+
+    // normalization for comparisons
+    function normalize(s){ return String(s ?? '').trim().toLowerCase(); }
+    function arraysEqualIgnoreOrder(a,b){
+      if(!Array.isArray(a) || !Array.isArray(b)) return false;
+      const na = a.map(x=>normalize(x)).sort();
+      const nb = b.map(x=>normalize(x)).sort();
+      if(na.length !== nb.length) return false;
+      return na.every((v,i) => v === nb[i]);
+    }
+    function deepMatchEqual(objA, objB){
+      // both should be objects, compare keys and values normalized
+      if(!objA || !objB) return false;
+      const ka = Object.keys(objA).map(k=>String(k).trim());
+      const kb = Object.keys(objB).map(k=>String(k).trim());
+      if(ka.length !== kb.length) return false;
+      return ka.every(k => {
+        if(!(k in objB)) return false;
+        return normalize(objA[k]) === normalize(objB[k]);
+      });
+    }
+
+    // safe escape for innerHTML text pieces
+    function esc(s){ return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+    // formatting helpers for modal / feedback
+    function formatSelected(sel){
+      if(sel == null) return '';
+      if(Array.isArray(sel)) return sel.join(', ');
+      if(typeof sel === 'object') return Object.entries(sel).map(([l,r]) => `${l} → ${r}`).join(', ');
+      return String(sel);
+    }
+
+    // shuffle helper (Fisher-Yates)
+    function shuffle(arr){
+      const a = Array.isArray(arr) ? arr.slice() : [];
+      for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+      return a;
+    }
+
+    // LOAD CSV (PapaParse)
+    let questions = [];
+    Papa.parse(QUESTIONS_URL, {
+      download: true, header: true, skipEmptyLines: true,
+      complete: function(res){
+        try {
+          const rawRows = (res && res.data) ? res.data : [];
+          // normalize each row (keys -> alphanumeric-lower, values trimmed)
+          const normalized = rawRows.map(normalizeRow).filter(r => Object.keys(r).length > 0);
+          // filter by case id - compare trimmed exact
+          const caseId = caseIdParam;
+          questions = normalized.filter(r => {
+            const cid = (r.caseid || r.case_id || '').toString().trim();
+            return cid && cid === caseId && (r.questiontext && r.questiontext.trim().length > 0);
+          });
+
+          if(!questions.length){
+            quizDiv.innerHTML = '';
+            msg.innerHTML = `No questions found for case_id="${esc(caseId)}". <a href="index.html">Go back</a>.`;
+            submitBtn.disabled = true;
+            return;
+          }
+
+          // render
+          renderQuiz();
+          submitBtn.disabled = false;
+        } catch (err){
+          console.error('Error processing CSV', err);
+          quizDiv.innerHTML = '';
+          msg.innerHTML = 'Error reading questions. Open console for details.';
+          submitBtn.disabled = true;
+        }
+      },
+      error: function(err){
+        console.error('Failed to fetch CSV:', err);
+        quizDiv.innerHTML = '';
+        msg.innerHTML = 'Failed to load questions (network/CORS).';
+        submitBtn.disabled = true;
+      }
+    });
+
+    // RENDER function
+    function renderQuiz(){
+      quizDiv.innerHTML = '';
+      msg.innerHTML = '';
+
+      questions.forEach((r, idx) => {
+        // r has normalized keys: questiontext, questiontype, options, correctanswer, reasoning ...
+        const qText = r.questiontext || r.question_text || '';
+        const qType = (r.questiontype || r.question_type || '').toLowerCase();
+        const rawOptions = r.options || '';
+        const parsedOpts = parseOptions(rawOptions);
+
+        const qDiv = document.createElement('div');
+        qDiv.className = 'question';
+
+        let optionsHtml = '';
+        if(qType === 'mcq' || qType === 'multi'){
+          // parsedOpts could be array OR object (if someone supplied {"a":"A","b":"B"})
+          let optsArray = [];
+          if(Array.isArray(parsedOpts)) optsArray = parsedOpts;
+          else if(parsedOpts && typeof parsedOpts === 'object') optsArray = Object.values(parsedOpts);
+          else optsArray = [String(parsedOpts)];
+          optsArray.forEach(opt => {
+            const value = String(opt ?? '').trim();
+            const type = qType === 'mcq' ? 'radio' : 'checkbox';
+            // ensure each input has id for accessibility maybe; we use name-based grouping
+            optionsHtml += `<label><input type="${type}" name="q${idx}" value="${esc(value)}"> ${esc(value)}</label>`;
+          });
+        } else if(qType === 'short'){
+          optionsHtml = `<input type="text" id="q${idx}" placeholder="Type your answer">`;
+        } else if(qType === 'match'){
+          // parsedOpts may be object or array of pairs
+          let obj = {};
+          if(parsedOpts && typeof parsedOpts === 'object' && !Array.isArray(parsedOpts)){
+            obj = parsedOpts;
+          } else if(Array.isArray(parsedOpts)){
+            // if even-length array, use pairs
+            if(parsedOpts.length % 2 === 0){
+              for(let i=0;i<parsedOpts.length;i+=2) obj[String(parsedOpts[i]).trim()] = String(parsedOpts[i+1]).trim();
+            } else {
+              // fallback: try split each element by ':' to form mapping
+              parsedOpts.forEach(el => {
+                const s = String(el);
+                const parts = s.split(':');
+                if(parts.length >= 2){ obj[parts[0].trim()] = parts.slice(1).join(':').trim(); }
+              });
+            }
+          } else {
+            // last resort: try parse from raw options string using ":" and "||"
+            const fallback = parseOptions(rawOptions);
+            if(typeof fallback === 'object' && !Array.isArray(fallback)) obj = fallback;
+          }
+
+          const lefts = Object.keys(obj || {});
+          const rights = shuffle(Object.values(obj || {}));
+          lefts.forEach((left, i) => {
+            optionsHtml += `<div style="margin-bottom:.5rem;"><strong>${esc(left)}</strong> → 
+              <select name="q${idx}-${i}"><option value="">Select</option>${rights.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('')}</select></div>`;
+          });
+        } else {
+          optionsHtml = `<div style="color:#ef4444">Unsupported question type: ${esc(qType)}</div>`;
+        }
+
+        qDiv.innerHTML = `
+          <p style="font-size:1.08em;font-weight:600;color:#334155;margin-bottom:.7rem;">
+            <span style="color:#2563eb;">${idx+1}.</span> ${esc(qText)}
+          </p>
+          <div class="options">${optionsHtml}</div>
+          <div class="feedback" id="fb${idx}" aria-live="polite"></div>
+        `;
+        quizDiv.appendChild(qDiv);
+      });
+    }
+
+    // SUBMIT logic
+    submitBtn.addEventListener('click', () => {
+      submitBtn.disabled = true; // avoid multiple clicks
+      let score = 0;
+      const wrongs = [];
+
+      questions.forEach((r, idx) => {
+        const fb = document.getElementById('fb'+idx);
+        fb.innerHTML = '';
+        const qType = (r.questiontype || r.question_type || '').toLowerCase();
+        const correctRaw = parseCorrect(r.correctanswer || r.correct_answer || '');
+        const reasoning = r.reasoning || '';
+
+        // prepare correct values
+        const correctIsObject = (typeof correctRaw === 'object' && !Array.isArray(correctRaw));
+        const correctArr = correctIsObject ? [] : (Array.isArray(correctRaw) ? correctRaw : [correctRaw]);
+
+        // selected values
+        let selected = null;
+        if(qType === 'mcq'){
+          const sel = document.querySelector(`input[name="q${idx}"]:checked`);
+          selected = sel ? [String(sel.value).trim()] : [];
+        } else if(qType === 'multi'){
+          selected = Array.from(document.querySelectorAll(`input[name="q${idx}"]:checked`)).map(i => String(i.value).trim());
+        } else if(qType === 'short'){
+          const el = document.getElementById(`q${idx}`);
+          selected = [ el && el.value ? String(el.value).trim() : '' ];
+        } else if(qType === 'match'){
+          // reconstruct selected object from selects
+          let selectedObj = {};
+          // find selects for this question
+          const selects = Array.from(document.querySelectorAll(`[name^="q${idx}-"]`));
+          selects.forEach((sel, i) => {
+            const parent = sel.closest('div');
+            const strong = parent ? parent.querySelector('strong') : null;
+            const left = strong ? String(strong.textContent).trim() : `left${i}`;
+            if(sel.value) selectedObj[left] = String(sel.value).trim();
+          });
+          selected = selectedObj;
+        }
+
+        // determine correctness
+        let isCorrect = false;
+        if(qType === 'match'){
+          // correctRaw should ideally be an object mapping
+          let correctObj = {};
+          if(typeof correctRaw === 'object' && !Array.isArray(correctRaw)) correctObj = correctRaw;
+          else {
+            // fallback try parse options
+            try { correctObj = JSON.parse(r.correctanswer); } catch(e){}
+          }
+          isCorrect = deepMatchEqual(selected, correctObj);
+        } else if(qType === 'short'){
+          const cand = normalize(selected[0] || '');
+          const acceptable = (Array.isArray(correctArr) ? correctArr : [correctArr]).map(x => normalize(x));
+          isCorrect = acceptable.some(a => a === cand);
+        } else {
+          // mcq & multi
+          isCorrect = arraysEqualIgnoreOrder(selected || [], correctArr || []);
+        }
+
+        // present feedback
+        if(isCorrect){
+          fb.innerHTML = `✅ Correct!<br>Your Answer: <em>${esc(formatSelected(selected))}</em>${reasoning ? `<div style="margin-top:.35rem;color:#64748b">${esc(reasoning)}</div>` : ''}`;
+          fb.className = 'feedback correct';
+          score++;
+        } else {
+          const correctDisplay = (qType === 'match') ? (typeof correctRaw === 'object' ? formatSelected(correctRaw) : formatSelected(correctRaw)) : formatSelected(correctArr);
+          fb.innerHTML = `❌ Incorrect<br>Your Answer: <em>${esc(formatSelected(selected) || '—')}</em><br><strong>Correct:</strong> <em>${esc(correctDisplay)}</em>${reasoning ? `<div style="margin-top:.35rem;color:#64748b">${esc(reasoning)}</div>` : ''}`;
+          fb.className = 'feedback incorrect';
+          wrongs.push({
+            idx: idx+1,
+            question: r.questiontext || r.question_text || '',
+            selected: selected,
+            correct: correctDisplay,
+            reasoning: reasoning || ''
+          });
+        }
+      }); // end forEach
+
+      // show modal
+      showModal(score, questions.length, wrongs);
+      submitBtn.disabled = false;
+    });
+
+    // Modal show/hide
+    function showModal(score, total, wrongs){
+      modalBg.innerHTML = '';
+      let html = `<div class="modal" role="dialog" aria-modal="true"><h2>Quiz Complete</h2><div class="score">Your Score: ${score} / ${total}</div>`;
+      if(wrongs.length){
+        html += `<div style="text-align:left;"><strong>Review:</strong>`;
+        wrongs.forEach(w => {
+          html += `<div class="wrong-detail"><strong>Q${w.idx}.</strong> ${esc(w.question)}<br>
+            <span style="color:#ef4444;">Your answer:</span> <em>${esc(formatSelected(w.selected)) || '—'}</em><br>
+            <span style="color:#16a34a;">Correct:</span> <em>${esc(w.correct)}</em>
+            ${w.reasoning ? `<div style="margin-top:.35rem;color:#64748b">${esc(w.reasoning)}</div>` : ''}
+          </div>`;
+        });
+        html += `</div>`;
+      } else {
+        html += `<div style="color:#16a34a;font-weight:600;margin:1em 0;">All answers correct! 🎉</div>`;
+      }
+      html += `<button class="close-btn" id="modalClose">Close</button></div>`;
+      modalBg.innerHTML = html;
+      modalBg.style.display = 'flex';
+      modalBg.setAttribute('aria-hidden','false');
+
+      // focus and event
+      const closeBtn = document.getElementById('modalClose');
+      if(closeBtn) closeBtn.focus();
+      function closeHandler(){ modalBg.style.display = 'none'; modalBg.setAttribute('aria-hidden','true'); modalBg.innerHTML = ''; document.removeEventListener('keydown', onEsc); }
+      closeBtn && closeBtn.addEventListener('click', closeHandler);
+
+      // click outside to close
+      modalBg.addEventListener('click', function(ev){
+        if(ev.target === modalBg) closeHandler();
+      });
+
+      function onEsc(e){ if(e.key === 'Escape') closeHandler(); }
+      document.addEventListener('keydown', onEsc);
+    }
+
+  })();
+  </script>
+</body>
+</html>

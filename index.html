@@ -1,0 +1,243 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Case Quiz – Cases</title>
+  <style>
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      background: linear-gradient(180deg, #f3f4f6 0%, #e0e7ef 100%);
+      margin: 0;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+    .case-card {
+      background: #fff;
+      padding: 1.2rem 1.1rem 1.1rem 1.1rem;
+      margin: 1.2rem 0;
+      border-radius: 16px;
+      box-shadow: 0 4px 18px rgba(30,41,59,0.10), 0 1.5px 4px rgba(30,41,59,0.06);
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+      transition: box-shadow 0.2s;
+    }
+    .case-card:hover {
+      box-shadow: 0 8px 32px rgba(30,41,59,0.13), 0 2px 8px rgba(30,41,59,0.09);
+    }
+    .case-card h3 {
+      margin: 0 0 .5rem;
+      font-size: 1.18em;
+      color: #2563eb;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+    .case-card a {
+      color: #fff;
+      background: linear-gradient(90deg, #2563eb 60%, #60a5fa 100%);
+      text-decoration: none;
+      font-weight: 600;
+      padding: 0.5rem 1.1rem;
+      border-radius: 8px;
+      display: inline-block;
+      margin-top: 0.7rem;
+      box-shadow: 0 2px 8px rgba(37,99,235,0.08);
+      transition: background 0.18s, box-shadow 0.18s;
+    }
+    .case-card a:hover {
+      background: linear-gradient(90deg, #1d4ed8 60%, #38bdf8 100%);
+      box-shadow: 0 4px 16px rgba(37,99,235,0.13);
+    }
+    .skeleton {
+      background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+      background-size: 200% 100%;
+      animation: skeleton-loading 1.2s infinite linear;
+      border-radius: 12px;
+      min-height: 80px;
+      margin: 1.2rem auto;
+      max-width: 600px;
+    }
+    @keyframes skeleton-loading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    @media (max-width: 700px) {
+      body { padding: 0.5rem; font-size: 1.05em; }
+      .case-card, .skeleton { padding: 0.7rem; border-radius: 10px; }
+      h1 { font-size: 1.2em; }
+    }
+    @media (max-width: 480px) {
+      .case-card, .skeleton { padding: 0.4rem; }
+      h1 { font-size: 1em; }
+    }
+  </style>
+</head>
+<body>
+  <h1 style="text-align:center; margin-bottom:1.5rem; letter-spacing:-1px; font-weight:700; color:#1e293b;">Available Clinical Cases</h1>
+  <div id="cases"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script>
+    const CASES_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSETi226ZBtZelVhRmXvYVWO-OxxieKnXYrvn5DVioPDsV-rNGQqy8qiVpxEarb2P4XlkAZZ6pw3xmB/pub?gid=0&single=true&output=csv";
+
+    // Show skeletons while loading
+    const casesDiv = document.getElementById("cases");
+    for(let i=0;i<3;i++){
+      const skel = document.createElement('div');
+      skel.className = 'skeleton';
+      casesDiv.appendChild(skel);
+    }
+
+    Papa.parse(CASES_URL, {
+      download: true,
+      header: true,
+      complete: function(results) {
+        casesDiv.innerHTML = "";
+        results.data.forEach(caseItem => {
+          if(caseItem.case_id){
+            const card = document.createElement("div");
+            card.className = "case-card";
+            card.innerHTML = `
+              <h3>${caseItem.title}</h3>
+              <p style='color:#64748b; margin-bottom:0.7rem;'>${caseItem.description}</p>
+              <a href="case1.html?case_id=${caseItem.case_id}">Start Quiz →</a>
+            `;
+            casesDiv.appendChild(card);
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html> -->
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Case Quiz – Cases</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      background: linear-gradient(180deg, #f3f4f6 0%, #e0e7ef 100%);
+      margin: 0;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      letter-spacing: -1px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .case-card {
+      background: #fff;
+      padding: 1.2rem;
+      margin: 1.2rem auto;
+      border-radius: 16px;
+      box-shadow: 0 4px 18px rgba(30,41,59,0.10), 0 1.5px 4px rgba(30,41,59,0.06);
+      max-width: 600px;
+      transition: box-shadow 0.2s;
+    }
+    .case-card:hover {
+      box-shadow: 0 8px 32px rgba(30,41,59,0.13), 0 2px 8px rgba(30,41,59,0.09);
+    }
+    .case-card h3 {
+      margin: 0 0 0.5rem;
+      font-size: 1.18em;
+      color: #2563eb;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+    .case-card p {
+      color: #64748b;
+      margin: 0 0 0.7rem;
+    }
+    .case-card a {
+      color: #fff;
+      background: linear-gradient(90deg, #2563eb 60%, #60a5fa 100%);
+      text-decoration: none;
+      font-weight: 600;
+      padding: 0.5rem 1.1rem;
+      border-radius: 8px;
+      display: inline-block;
+      box-shadow: 0 2px 8px rgba(37,99,235,0.08);
+      transition: background 0.18s, box-shadow 0.18s;
+    }
+    .case-card a:hover {
+      background: linear-gradient(90deg, #1d4ed8 60%, #38bdf8 100%);
+      box-shadow: 0 4px 16px rgba(37,99,235,0.13);
+    }
+    .skeleton {
+      background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+      background-size: 200% 100%;
+      animation: skeleton-loading 1.2s infinite linear;
+      border-radius: 12px;
+      min-height: 80px;
+      margin: 1.2rem auto;
+      max-width: 600px;
+    }
+    @keyframes skeleton-loading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    @media (max-width: 700px) {
+      body { padding: 0.5rem; font-size: 1.05em; }
+      .case-card, .skeleton { padding: 0.7rem; border-radius: 10px; }
+      h1 { font-size: 1.2em; }
+    }
+    @media (max-width: 480px) {
+      .case-card, .skeleton { padding: 0.4rem; }
+      h1 { font-size: 1em; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Available Clinical Cases</h1>
+  <div id="cases"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script>
+    const CASES_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSETi226ZBtZelVhRmXvYVWO-OxxieKnXYrvn5DVioPDsV-rNGQqy8qiVpxEarb2P4XlkAZZ6pw3xmB/pub?gid=0&single=true&output=csv";
+    const casesDiv = document.getElementById("cases");
+
+    // Skeletons
+    for (let i = 0; i < 3; i++) {
+      const skel = document.createElement("div");
+      skel.className = "skeleton";
+      casesDiv.appendChild(skel);
+    }
+
+    Papa.parse(CASES_URL, {
+      download: true,
+      header: true,
+      complete: function(results) {
+        casesDiv.innerHTML = "";
+        results.data.forEach(c => {
+          if (c.case_id && c.title) {
+            const card = document.createElement("div");
+            card.className = "case-card";
+            card.innerHTML = `
+              <h3>${c.title}</h3>
+              <p>${c.description || ""}</p>
+              <a href="case.html?case_id=${c.case_id}">Start Quiz →</a>
+            `;
+            casesDiv.appendChild(card);
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
